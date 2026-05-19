@@ -5,6 +5,7 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Verify from './pages/Verify';
+import AITools from './pages/AITools';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/verify" element={<Verify />} />
+          <Route path="/ai-tools" element={<AITools />} />
         </Routes>
       </main>
 

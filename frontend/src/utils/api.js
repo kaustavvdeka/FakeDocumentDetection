@@ -34,10 +34,19 @@ export const api = {
   },
 
   // AI
-  analyzeDocument: async (formData) => {
-    const res = await fetch(`${API_BASE_URL}/ai/analyze`, {
+  analyzeForgery: async (formData) => {
+    const res = await fetch(`${API_BASE_URL}/ai/analyze-forgery`, {
       method: 'POST',
       body: formData, // FormData containing file
+    });
+    return res.json();
+  },
+  
+  analyzeText: async (textData) => {
+    const res = await fetch(`${API_BASE_URL}/ai/analyze-text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(textData),
     });
     return res.json();
   },

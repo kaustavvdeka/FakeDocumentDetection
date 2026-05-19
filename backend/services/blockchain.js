@@ -16,13 +16,16 @@ try {
 // Load ABIs
 const proofChainABIPath = path.join(__dirname, "..", "..", "artifacts", "contracts", "ProofChain.sol", "ProofChain.json");
 const soulboundABIPath = path.join(__dirname, "..", "..", "artifacts", "contracts", "SoulboundNFT.sol", "SoulboundNFT.json");
+const merkleRegistryABIPath = path.join(__dirname, "..", "..", "artifacts", "contracts", "MerkleDocumentRegistry.sol", "MerkleDocumentRegistry.json");
 
 let proofChainABI = [];
 let soulboundABI = [];
+let merkleRegistryABI = [];
 
 try {
   proofChainABI = JSON.parse(fs.readFileSync(proofChainABIPath, "utf8")).abi;
   soulboundABI = JSON.parse(fs.readFileSync(soulboundABIPath, "utf8")).abi;
+  merkleRegistryABI = JSON.parse(fs.readFileSync(merkleRegistryABIPath, "utf8")).abi;
 } catch (error) {
   console.warn("Contract ABIs not found. Compile contracts first.");
 }
@@ -37,6 +40,7 @@ const signer = new ethers.Wallet(PRIVATE_KEY, provider);
 // Contract instances
 let proofChainContract = null;
 let soulboundContract = null;
+let merkleRegistryContract = null;
 
 if (contractConfig.contracts.ProofChain) {
   proofChainContract = new ethers.Contract(
@@ -54,10 +58,19 @@ if (contractConfig.contracts.SoulboundNFT) {
   );
 }
 
+if (contractConfig.contracts.MerkleDocumentRegistry) {
+  merkleRegistryContract = new ethers.Contract(
+    contractConfig.contracts.MerkleDocumentRegistry,
+    merkleRegistryABI,
+    signer
+  );
+}
+
 module.exports = {
   provider,
   signer,
   proofChainContract,
   soulboundContract,
+  merkleRegistryContract,
   contractConfig,
 };

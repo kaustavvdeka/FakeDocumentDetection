@@ -156,4 +156,40 @@ router.post("/revoke", async (req, res) => {
   }
 });
 
+// POST /api/documents/batch-register - Register a batch of documents using Merkle root
+router.post("/batch-register", async (req, res) => {
+  try {
+    const { merkleRoot, ipfsBatchCID, batchLabel, documentType, documentCount, issuerName } = req.body;
+    
+    if (!merkleRoot || !ipfsBatchCID || !batchLabel || !documentType || !documentCount || !issuerName) {
+      return res.status(400).json({ success: false, error: "Missing required fields" });
+    }
+
+    const { merkleRegistryContract } = require("../services/blockchain");
+    if (!merkleRegistryContract) {
+      return res.status(503).json({ success: false, error: "MerkleRegistryContract not deployed" });
+    }
+
+    const tx = await merkleRegistryContract.registerBatch(
+      merkleRoot.startsWith("0x") ? merkleRoot : "0x" + merkleRoot,
+      ipfsBatchCID,
+      batchLabel,
+      documentType,
+      documentCount,
+      issuerName
+    );
+    const receipt = await tx.wait();
+
+    res.json({
+      success: true,
+      transactionHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      merkleRoot
+    });
+  } catch (error) {
+    console.error("Batch register error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

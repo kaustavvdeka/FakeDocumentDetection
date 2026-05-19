@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useWeb3 } from '../context/Web3Context';
-import { Shield, Wallet, LayoutDashboard, Search, Menu, X } from 'lucide-react';
+import { Shield, Wallet, LayoutDashboard, Search, Menu, X, BrainCircuit } from 'lucide-react';
 import { useState } from 'react';
 
 const Navbar = () => {
@@ -25,6 +25,10 @@ const Navbar = () => {
             <Link to="/verify" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
               <Search className="w-4 h-4" />
               <span>Verify Document</span>
+            </Link>
+            <Link to="/ai-tools" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
+              <BrainCircuit className="w-4 h-4" />
+              <span>AI Tools</span>
             </Link>
             <Link to="/dashboard" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
               <LayoutDashboard className="w-4 h-4" />
@@ -72,6 +76,13 @@ const Navbar = () => {
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Verify Document
+            </Link>
+            <Link 
+              to="/ai-tools" 
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-white/5"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              AI Tools
             </Link>
             <Link 
               to="/dashboard" 
