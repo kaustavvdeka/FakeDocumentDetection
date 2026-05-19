@@ -22,6 +22,14 @@ async function main() {
   const soulboundAddress = await soulboundNFT.getAddress();
   console.log("SoulboundNFT deployed to:", soulboundAddress);
 
+  // Deploy MerkleDocumentRegistry
+  console.log("\n--- Deploying MerkleDocumentRegistry ---");
+  const MerkleDocumentRegistry = await hre.ethers.getContractFactory("MerkleDocumentRegistry");
+  const merkleRegistry = await MerkleDocumentRegistry.deploy();
+  await merkleRegistry.waitForDeployment();
+  const merkleAddress = await merkleRegistry.getAddress();
+  console.log("MerkleDocumentRegistry deployed to:", merkleAddress);
+
   // Save deployment addresses
   const deploymentInfo = {
     network: hre.network.name,
@@ -29,6 +37,7 @@ async function main() {
     contracts: {
       ProofChain: proofChainAddress,
       SoulboundNFT: soulboundAddress,
+      MerkleDocumentRegistry: merkleAddress,
     },
     timestamp: new Date().toISOString(),
   };
@@ -50,6 +59,7 @@ async function main() {
   // Copy ABIs for frontend
   const proofChainArtifact = await hre.artifacts.readArtifact("ProofChain");
   const soulboundArtifact = await hre.artifacts.readArtifact("SoulboundNFT");
+  const merkleArtifact = await hre.artifacts.readArtifact("MerkleDocumentRegistry");
   
   fs.writeFileSync(
     `${frontendDir}/ProofChainABI.json`,
@@ -59,12 +69,17 @@ async function main() {
     `${frontendDir}/SoulboundNFTABI.json`,
     JSON.stringify(soulboundArtifact.abi, null, 2)
   );
+  fs.writeFileSync(
+    `${frontendDir}/MerkleDocumentRegistryABI.json`,
+    JSON.stringify(merkleArtifact.abi, null, 2)
+  );
   console.log("ABIs copied to frontend");
 
   console.log("\n✅ All contracts deployed successfully!");
   console.log("=".repeat(50));
-  console.log(`ProofChain:   ${proofChainAddress}`);
-  console.log(`SoulboundNFT: ${soulboundAddress}`);
+  console.log(`ProofChain:             ${proofChainAddress}`);
+  console.log(`SoulboundNFT:           ${soulboundAddress}`);
+  console.log(`MerkleDocumentRegistry: ${merkleAddress}`);
   console.log("=".repeat(50));
 }
 
