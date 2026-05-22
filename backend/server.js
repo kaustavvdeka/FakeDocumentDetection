@@ -3,8 +3,14 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const dotenv = require("dotenv");
+const fs = require("fs");
 
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
+const backendEnv = path.join(__dirname, ".env");
+if (fs.existsSync(backendEnv)) {
+  dotenv.config({ path: backendEnv });
+} else {
+  dotenv.config({ path: path.join(__dirname, "..", ".env") });
+}
 
 const documentRoutes = require("./routes/documentRoutes");
 const verifyRoutes = require("./routes/verifyRoutes");
@@ -13,7 +19,7 @@ const aiRoutes = require("./routes/aiRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors({

@@ -55,3 +55,10 @@ project-root/
 ├── hardhat.config.js
 ├── package.json
 └── README.md
+
+## How to test this locally:
+Start your Hardhat node: npm run node
+Deploy the new contracts: npm run deploy
+Start the Backend: npm run backend
+Start the Frontend: npm run frontend
+Navigate to the "AI Tools" tab on the navigation bar, paste some ChatGPT-generated text, and see it get flagged in real-time!

@@ -40,7 +40,7 @@ const Verify = () => {
       formData.append('document', file);
 
       // 1. Run AI Analysis
-      const aiRes = await api.analyzeDocument(formData);
+      const aiRes = await api.analyzeForgery(formData);
       if (aiRes.success) {
         setAiResult(aiRes.data);
       }
