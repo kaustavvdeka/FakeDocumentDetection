@@ -6,12 +6,22 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title ProofChain
- * @notice Main contract for tamper-proof document verification on blockchain
- * @dev Manages document registration, verification, and issuer authorization
+ * @notice Optimized enterprise-grade contract for document verification and audit trails on blockchain
  */
 contract ProofChain is AccessControl, ReentrancyGuard {
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
+    // Custom errors for gas efficiency
+    error DocumentAlreadyExists(bytes32 documentHash);
+    error DocumentDoesNotExist(bytes32 documentHash);
+    error IssuerAlreadyRegistered(address issuerAddress);
+    error IssuerNotActive(address issuerAddress);
+    error InvalidOwnerAddress();
+    error InvalidIPFSHash();
+    error Unauthorized(address caller);
+    error InvalidInputLength();
+    error DocumentAlreadyRevoked(bytes32 documentHash);
 
     struct Document {
         bytes32 documentHash;       // SHA-256 hash of the document
@@ -34,6 +44,12 @@ contract ProofChain is AccessControl, ReentrancyGuard {
         uint256 documentsIssued;
     }
 
+    struct VerificationLog {
+        address verifier;
+        uint256 timestamp;
+        bool isAuthentic;
+    }
+
     // Mapping from document hash to Document struct
     mapping(bytes32 => Document) public documents;
     
@@ -46,12 +62,15 @@ contract ProofChain is AccessControl, ReentrancyGuard {
     // Mapping from issuer address to their issued document hashes
     mapping(address => bytes32[]) public issuerDocuments;
 
+    // Mapping from document hash to verification log history
+    mapping(bytes32 => VerificationLog[]) private verificationLogs;
+
     // Array of all document hashes for enumeration
     bytes32[] public allDocumentHashes;
     
     // Array of all issuer addresses
     address[] public allIssuers;
-
+ 
     // Total counts
     uint256 public totalDocuments;
     uint256 public totalIssuers;
@@ -92,13 +111,6 @@ contract ProofChain is AccessControl, ReentrancyGuard {
         uint256 timestamp
     );
 
-    event DocumentTransferred(
-        bytes32 indexed documentHash,
-        address indexed from,
-        address indexed to,
-        uint256 timestamp
-    );
-
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
@@ -121,19 +133,15 @@ contract ProofChain is AccessControl, ReentrancyGuard {
 
     /**
      * @notice Register a new issuer (admin only)
-     * @param _issuerAddress Address of the new issuer
-     * @param _name Name of the institution
-     * @param _category Category (university, company, government)
-     * @param _website Website URL
      */
     function registerIssuer(
         address _issuerAddress,
-        string memory _name,
-        string memory _category,
-        string memory _website
+        string calldata _name,
+        string calldata _category,
+        string calldata _website
     ) external onlyRole(ADMIN_ROLE) {
-        require(!issuers[_issuerAddress].isActive, "Issuer already registered");
-        require(bytes(_name).length > 0, "Name cannot be empty");
+        if (issuers[_issuerAddress].isActive) revert IssuerAlreadyRegistered(_issuerAddress);
+        if (bytes(_name).length == 0) revert InvalidOwnerAddress();
 
         issuers[_issuerAddress] = Issuer({
             name: _name,
@@ -155,7 +163,7 @@ contract ProofChain is AccessControl, ReentrancyGuard {
      * @notice Deactivate an issuer (admin only)
      */
     function deactivateIssuer(address _issuerAddress) external onlyRole(ADMIN_ROLE) {
-        require(issuers[_issuerAddress].isActive, "Issuer not active");
+        if (!issuers[_issuerAddress].isActive) revert IssuerNotActive(_issuerAddress);
         issuers[_issuerAddress].isActive = false;
         _revokeRole(ISSUER_ROLE, _issuerAddress);
 
@@ -166,22 +174,55 @@ contract ProofChain is AccessControl, ReentrancyGuard {
 
     /**
      * @notice Register a new document on-chain
-     * @param _documentHash SHA-256 hash of the document
-     * @param _owner Address of the document owner/recipient
-     * @param _ipfsHash IPFS CID where encrypted document is stored
-     * @param _documentType Type of document
      */
     function registerDocument(
         bytes32 _documentHash,
         address _owner,
+        string calldata _ipfsHash,
+        string calldata _documentType
+    ) external onlyRole(ISSUER_ROLE) nonReentrant {
+        if (documents[_documentHash].exists) revert DocumentAlreadyExists(_documentHash);
+        if (_owner == address(0)) revert InvalidOwnerAddress();
+        if (bytes(_ipfsHash).length == 0) revert InvalidIPFSHash();
+        if (!issuers[msg.sender].isActive) revert IssuerNotActive(msg.sender);
+
+        _registerSingleDocument(_documentHash, _owner, _ipfsHash, _documentType);
+    }
+
+    /**
+     * @notice Register multiple documents in batch for gas efficiency
+     */
+    function registerDocumentsBatch(
+        bytes32[] calldata _hashes,
+        address[] calldata _owners,
+        string[] calldata _ipfsHashes,
+        string[] calldata _documentTypes
+    ) external onlyRole(ISSUER_ROLE) nonReentrant {
+        uint256 len = _hashes.length;
+        if (len != _owners.length || len != _ipfsHashes.length || len != _documentTypes.length) {
+            revert InvalidInputLength();
+        }
+        if (!issuers[msg.sender].isActive) revert IssuerNotActive(msg.sender);
+
+        for (uint256 i = 0; i < len; i++) {
+            bytes32 docHash = _hashes[i];
+            if (documents[docHash].exists) revert DocumentAlreadyExists(docHash);
+            if (_owners[i] == address(0)) revert InvalidOwnerAddress();
+            if (bytes(_ipfsHashes[i]).length == 0) revert InvalidIPFSHash();
+
+            _registerSingleDocument(docHash, _owners[i], _ipfsHashes[i], _documentTypes[i]);
+        }
+    }
+
+    /**
+     * @dev Internal helper for registration logic
+     */
+    function _registerSingleDocument(
+        bytes32 _documentHash,
+        address _owner,
         string memory _ipfsHash,
         string memory _documentType
-    ) external onlyRole(ISSUER_ROLE) nonReentrant {
-        require(!documents[_documentHash].exists, "Document already registered");
-        require(_owner != address(0), "Invalid owner address");
-        require(bytes(_ipfsHash).length > 0, "IPFS hash required");
-        require(issuers[msg.sender].isActive, "Issuer is not active");
-
+    ) internal {
         documents[_documentHash] = Document({
             documentHash: _documentHash,
             issuer: msg.sender,
@@ -212,10 +253,7 @@ contract ProofChain is AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice Verify a document's authenticity
-     * @param _documentHash Hash to verify
-     * @return isAuthentic Whether document exists and is not revoked
-     * @return doc The full document record
+     * @notice Verify a document and write a verification log to the blockchain
      */
     function verifyDocument(bytes32 _documentHash) 
         external 
@@ -224,12 +262,23 @@ contract ProofChain is AccessControl, ReentrancyGuard {
         totalVerifications++;
         
         if (!documents[_documentHash].exists) {
+            verificationLogs[_documentHash].push(VerificationLog({
+                verifier: msg.sender,
+                timestamp: block.timestamp,
+                isAuthentic: false
+            }));
             emit DocumentVerified(_documentHash, msg.sender, false, block.timestamp);
             return (false, doc);
         }
 
         doc = documents[_documentHash];
         isAuthentic = !doc.isRevoked;
+
+        verificationLogs[_documentHash].push(VerificationLog({
+            verifier: msg.sender,
+            timestamp: block.timestamp,
+            isAuthentic: isAuthentic
+        }));
 
         emit DocumentVerified(_documentHash, msg.sender, isAuthentic, block.timestamp);
         return (isAuthentic, doc);
@@ -252,15 +301,49 @@ contract ProofChain is AccessControl, ReentrancyGuard {
     }
 
     /**
-     * @notice Revoke a document (issuer only)
+     * @notice Verify multiple document hashes in a single call (view only)
+     */
+    function verifyDocumentsBatch(bytes32[] calldata _hashes)
+        external
+        view
+        returns (bool[] memory isAuthenticList, Document[] memory docList)
+    {
+        uint256 len = _hashes.length;
+        isAuthenticList = new bool[](len);
+        docList = new Document[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            bytes32 hash = _hashes[i];
+            if (documents[hash].exists) {
+                docList[i] = documents[hash];
+                isAuthenticList[i] = !documents[hash].isRevoked;
+            } else {
+                isAuthenticList[i] = false;
+            }
+        }
+        return (isAuthenticList, docList);
+    }
+
+    /**
+     * @notice Retrieve the verification history of a document hash
+     */
+    function getVerificationLogs(bytes32 _documentHash)
+        external
+        view
+        returns (VerificationLog[] memory)
+    {
+        return verificationLogs[_documentHash];
+    }
+
+    /**
+     * @notice Revoke a document (issuer only or admin)
      */
     function revokeDocument(bytes32 _documentHash) external {
-        require(documents[_documentHash].exists, "Document does not exist");
-        require(
-            documents[_documentHash].issuer == msg.sender || hasRole(ADMIN_ROLE, msg.sender),
-            "Only issuer or admin can revoke"
-        );
-        require(!documents[_documentHash].isRevoked, "Already revoked");
+        if (!documents[_documentHash].exists) revert DocumentDoesNotExist(_documentHash);
+        if (documents[_documentHash].issuer != msg.sender && !hasRole(ADMIN_ROLE, msg.sender)) {
+            revert Unauthorized(msg.sender);
+        }
+        if (documents[_documentHash].isRevoked) revert DocumentAlreadyRevoked(_documentHash);
 
         documents[_documentHash].isRevoked = true;
 
@@ -269,38 +352,23 @@ contract ProofChain is AccessControl, ReentrancyGuard {
 
     // ==================== QUERY FUNCTIONS ====================
 
-    /**
-     * @notice Get all documents owned by an address
-     */
     function getOwnerDocuments(address _owner) external view returns (bytes32[] memory) {
         return ownerDocuments[_owner];
     }
 
-    /**
-     * @notice Get all documents issued by an issuer
-     */
     function getIssuerDocuments(address _issuer) external view returns (bytes32[] memory) {
         return issuerDocuments[_issuer];
     }
 
-    /**
-     * @notice Get document details
-     */
     function getDocument(bytes32 _documentHash) external view returns (Document memory) {
-        require(documents[_documentHash].exists, "Document does not exist");
+        if (!documents[_documentHash].exists) revert DocumentDoesNotExist(_documentHash);
         return documents[_documentHash];
     }
 
-    /**
-     * @notice Get issuer details
-     */
     function getIssuer(address _issuerAddress) external view returns (Issuer memory) {
         return issuers[_issuerAddress];
     }
 
-    /**
-     * @notice Get platform statistics
-     */
     function getStats() external view returns (
         uint256 _totalDocuments,
         uint256 _totalIssuers,
@@ -309,16 +377,10 @@ contract ProofChain is AccessControl, ReentrancyGuard {
         return (totalDocuments, totalIssuers, totalVerifications);
     }
 
-    /**
-     * @notice Check if an address is an active issuer
-     */
     function isActiveIssuer(address _addr) external view returns (bool) {
         return issuers[_addr].isActive;
     }
 
-    /**
-     * @notice Get total documents for an owner
-     */
     function getOwnerDocumentCount(address _owner) external view returns (uint256) {
         return ownerDocuments[_owner].length;
     }

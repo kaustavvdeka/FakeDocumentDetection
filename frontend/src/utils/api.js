@@ -10,6 +10,14 @@ export const api = {
     return res.json();
   },
   
+  registerDocumentBatch: async (formData) => {
+    const res = await fetch(`${API_BASE_URL}/documents/register-batch`, {
+      method: 'POST',
+      body: formData,
+    });
+    return res.json();
+  },
+  
   getDocument: async (hash) => {
     const res = await fetch(`${API_BASE_URL}/documents/${hash}`);
     return res.json();

@@ -1030,8 +1030,8 @@
       "artifacts": []
     },
     "/Users/kaustavmanideka/Documents/Project/FakeDocumentDetection/contracts/ProofChain.sol": {
-      "lastModificationDate": 1779200705754,
-      "contentHash": "253b0e5c9abd00d3baf4c2525d977776",
+      "lastModificationDate": 1779474856429,
+      "contentHash": "27b46f7d88e75bbe4b8c90a356ac49d4",
       "sourceName": "contracts/ProofChain.sol",
       "solcConfig": {
         "version": "0.8.27",
